@@ -18,7 +18,7 @@ max-width:800px;
 margin:0 auto;
 }
 
-input,button,select{
+input,button,select,textarea{
 width:100%;
 padding:12px;
 margin:8px 0;
@@ -65,6 +65,36 @@ border-radius:10px;
 box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
 
+.pilihan-jawaban{
+margin-top:10px;
+display:flex;
+flex-direction:column;
+gap:8px;
+}
+
+.pilihan{
+padding:10px;
+border-radius:8px;
+border:1px solid #ccc;
+cursor:pointer;
+transition:all 0.3s;
+}
+
+.pilihan:hover{
+background:#e8f5e9;
+}
+
+.pilihan.benar{
+background:#c8e6c9;
+border-color:#4CAF50;
+font-weight:bold;
+}
+
+.pilihan.salah{
+background:#ffcdd2;
+border-color:#f44336;
+}
+
 #menu{
 margin-top:15px;
 padding:20px;
@@ -93,6 +123,39 @@ cursor:pointer;
 
 .switch-form:hover{
 text-decoration:underline;
+}
+
+#skorContainer{
+text-align:center;
+font-size:18px;
+font-weight:bold;
+margin:15px 0;
+color:#333;
+}
+
+#riwayatContainer{
+background:#e8f5e9;
+padding:15px;
+border-radius:10px;
+text-align:center;
+margin-bottom:15px;
+}
+
+#mapelEditSection{
+background:#fff3e0;
+padding:15px;
+border-radius:10px;
+margin-top:15px;
+}
+
+.admin-label{
+color:#f57c00;
+font-weight:bold;
+}
+
+#gcButton{
+background:#25D366;
+margin-top:10px;
 }
 </style>
 </head>
@@ -126,10 +189,24 @@ text-decoration:underline;
 </div>
 
 <h2>Halo, <span id="userName"></span>! 📚</h2>
+
+<!-- Tombol Utama -->
 <button onclick="copyNomor()">Copy Nomor Admin</button>
 <button onclick="bukaMenu()">>>> Buka Menu Quiz <<<</button>
+<button id="gcButton" onclick="bukaGC()">Buka Grup Belajar</button>
 <button onclick="logout()">Keluar dari Akun</button>
 
+<!-- Riwayat Permainan -->
+<div id="riwayatContainer" class="hidden">
+<p><b>Riwayat Permainan Sebelumnya</b></p>
+<p>Mapel: <span id="riwayatMapel"></span></p>
+<p>Sudah Jawab: <span id="riwayatJumlah"></span> dari <span id="riwayatTotal"></span> Soal</p>
+<p>Skor Saat Ini: <span id="riwayatSkor"></span></p>
+<button onclick="lanjutkanQuiz()">Lanjutkan Permainan</button>
+<button onclick="hapusRiwayat()">Hapus Riwayat & Mulai Baru</button>
+</div>
+
+<!-- Menu Quiz -->
 <div id="menu" class="hidden">
 <select id="mapel" required>
 <option value="">-- Pilih Mata Pelajaran --</option>
@@ -146,59 +223,183 @@ text-decoration:underline;
 <button onclick="mulaiQuiz()">Mulai Kerjakan Soal</button>
 <button onclick="resetForm()">Reset Pilihan</button>
 </div>
+
+<!-- Bagian Edit Nama Mapel (Bisa Kamu Edit Sendiri) -->
+<div id="mapelEditSection" class="hidden">
+<p class="admin-label">EDIT NAMA MATA PELAJARAN (Isi kolom di bawah untuk ganti nama)</p>
+<textarea id="mapelNamaCustom" rows="3" placeholder="Contoh:
+MTK=Matematika Kelas 7
+IPAS=Ilmu Pengetahuan Alam & Sosial"></textarea>
+<button onclick="simpanNamaMapel()">Simpan Nama Mapel</button>
+<button onclick="resetNamaMapel()">Kembalikan Nama Default</button>
+</div>
 </div>
 
 <!-- Halaman Quiz -->
 <div id="quiz" class="hidden">
 <h2>Soal <span id="mapelNama"></span></h2>
-<button onclick="kembaliHome()">Kembali ke Utama</button>
+<div id="skorContainer">Skor: <span id="skor">0</span> / <span id="totalSoal">0</span></div>
+<button onclick="simpanRiwayatDanKembali()">Simpan & Kembali ke Utama</button>
 <div id="soalContainer"></div>
+<div id="hasilAkhir" class="hidden">
+<h3>HASIL AKHIR!</h3>
+<p id="pesanHasil"></p>
+<button onclick="kembaliHomeSetelahHasil()">Kembali ke Utama</button>
+</div>
 </div>
 
 <script>
-// Data Soal (ditambah lagi biar lebih banyak pilihan random)
+// Data Soal + Pilihan Jawaban
 const soalData = {
 MTK:[
-"12 + 8 = ?", "15 x 4 = ?", "100 : 5 = ?", "7² = ?", "30% dari 100 = ?",
-"25 - 9 = ?", "√144 = ?", "5/100 = berapa % ?", "4 + (3 x 2) = ?", "Volume kubus sisi 5 cm = ?",
-"1 jam = berapa detik?", "Lebar persegi panjang 4m, panjang 6m, luasnya = ?", "9 x 9 = ?", "1/2 dari 80 = ?", "50 + 75 = ?",
-"200 - 35 = ?", "6³ = ?", "15% dari 200 = ?", "8 : 0.5 = ?", "Keliling lingkaran jari-jari 7cm = ?"
+{soal:"12 + 8 = ?", pilihan:["20", "22", "18", "25"], benar:0},
+{soal:"15 x 4 = ?", pilihan:["50", "60", "70", "45"], benar:1},
+{soal:"100 : 5 = ?", pilihan:["15", "25", "20", "18"], benar:2},
+{soal:"7² = ?", pilihan:["42", "49", "56", "63"], benar:1},
+{soal:"30% dari 100 = ?", pilihan:["3", "30", "300", "0.3"], benar:1},
+{soal:"25 - 9 = ?", pilihan:["16", "18", "14", "20"], benar:0},
+{soal:"√144 = ?", pilihan:["10", "11", "12", "13"], benar:2},
+{soal:"5/100 = berapa % ?", pilihan:["50%", "5%", "0.5%", "0.05%"], benar:1},
+{soal:"4 + (3 x 2) = ?", pilihan:["10", "14", "9", "12"], benar:0},
+{soal:"Volume kubus sisi 5 cm = ?", pilihan:["125 cm³", "25 cm³", "50 cm³", "150 cm³"], benar:0},
+{soal:"1 jam = berapa detik?", pilihan:["360", "3600", "600", "1800"], benar:1},
+{soal:"Luas persegi panjang (lebar 4m, panjang 6m) = ?", pilihan:["20 m²", "24 m²", "10 m²", "30 m²"], benar:1},
+{soal:"9 x 9 = ?", pilihan:["72", "81", "90", "63"], benar:1},
+{soal:"1/2 dari 80 = ?", pilihan:["30", "40", "20", "60"], benar:1},
+{soal:"50 + 75 = ?", pilihan:["125", "130", "115", "120"], benar:0},
+{soal:"200 - 35 = ?", pilihan:["165", "175", "155", "185"], benar:0},
+{soal:"6³ = ?", pilihan:["18", "36", "216", "108"], benar:2},
+{soal:"15% dari 200 = ?", pilihan:["30", "15", "45", "20"], benar:0},
+{soal:"8 : 0.5 = ?", pilihan:["4", "16", "8.5", "12"], benar:1},
+{soal:"Keliling lingkaran jari-jari 7cm = ?", pilihan:["22cm", "44cm", "14cm", "33cm"], benar:1}
 ],
 
 IPAS:[
-"Apa planet terbesar di Tata Surya?", "Fungsi utama akar tumbuhan?", "Apa itu fotosintesis?", "Sumber energi matahari?", "Nama satelit alami bumi?",
-"Zat yang dibutuhkan manusia untuk bernapas?", "Jenis tanah paling gembur?", "Apa itu siklus air?", "Bagian tumbuhan buat makanan?", "Hewan yang bernapas dengan insang?",
-"Apa itu oksigen?", "Nama gunung berapi aktif terbesar Indonesia?", "Apa itu gempa bumi?", "Fungsi paru-paru pada hewan?", "Apa itu DNA?",
-"Bagian mata yang menangkap cahaya?", "Apa itu zat gizi makro?", "Nama ikan yang bisa hidup di air tawar dan laut?", "Apa itu lapisan ozon?", "Sumber energi terbarukan apa saja?"
+{soal:"Apa planet terbesar di Tata Surya?", pilihan:["Mars", "Venus", "Jupiter", "Bumi"], benar:2},
+{soal:"Fungsi utama akar tumbuhan?", pilihan:["Buat makanan", "Menyerap air & zat hara", "Tampung buah", "Tempat fotosintesis"], benar:1},
+{soal:"Apa itu fotosintesis?", pilihan:["Proses buang zat sisa", "Proses membuat makanan oleh tumbuhan", "Proses tumbuh kembang", "Proses bernapas"], benar:1},
+{soal:"Sumber energi matahari?", pilihan:["Reaksi fusi nuklir", "Reaksi fisi nuklir", "Pembakaran batu bara", "Arus listrik"], benar:0},
+{soal:"Nama satelit alami bumi?", pilihan:["Venus", "Mars", "Bulan", "Merkurius"], benar:2},
+{soal:"Zat yang dibutuhkan manusia untuk bernapas?", pilihan:["Karbon dioksida", "Oksigen", "Hidrogen", "Nitrogen"], benar:1},
+{soal:"Jenis tanah paling gembur?", pilihan:["Tanah liat", "Tanah pasir", "Tanah lempung", "Tanah aluvial"], benar:1},
+{soal:"Apa itu siklus air?", pilihan:["Pergerakan air dari laut ke awan ke darat", "Proses pembentukan es", "Proses penguapan air dari tanaman", "Pergerakan air di dalam tanah"], benar:0},
+{soal:"Bagian tumbuhan buat makanan?", pilihan:["Akar", "Batang", "Daun", "Bunga"], benar:2},
+{soal:"Hewan yang bernapas dengan insang?", pilihan:["Ikan", "Burung", "Kucing", "Ular"], benar:0},
+{soal:"Apa itu oksigen?", pilihan:["Gas beracun", "Gas yang dibutuhkan untuk bernapas", "Gas hasil pembakaran", "Gas utama di atmosfer"], benar:1},
+{soal:"Gunung berapi aktif terbesar Indonesia?", pilihan:["Gunung Rinjani", "Gunung Semeru", "Gunung Tambora", "Gunung Krakatau"], benar:2},
+{soal:"Apa itu gempa bumi?", pilihan:["Getaran permukaan bumi akibat pergerakan lempengan tektonik", "Banjir besar", "Angin kencang", "Letusan gunung berapi"], benar:0},
+{soal:"Fungsi paru-paru pada hewan?", pilihan:["Menyerap makanan", "Bernapas", "Menyimpan zat makanan", "Mengeluarkan zat sisa"], benar:1},
+{soal:"Apa itu DNA?", pilihan:["Zat pembentuk sel darah", "Molekul pembawa informasi genetik", "Zat lemak dalam tubuh", "Vitamin penting untuk tubuh"], benar:1},
+{soal:"Bagian mata yang menangkap cahaya?", pilihan:["Iris", "Pupil", "Retina", "Kornea"], benar:2},
+{soal:"Apa itu zat gizi makro?", pilihan:["Zat yang dibutuhkan dalam jumlah banyak", "Zat yang dibutuhkan dalam jumlah sedikit", "Vitamin dan mineral", "Zat pelarut"], benar:0},
+{soal:"Ikan yang bisa hidup di air tawar dan laut?", pilihan:["Ikan mas", "Ikan lele", "Ikan bandeng", "Ikan mujair"], benar:2},
+{soal:"Apa itu lapisan ozon?", pilihan:["Lapisan yang menghangatkan bumi", "Lapisan yang menangkal sinar UV berbahaya", "Lapisan tempat pesawat terbang", "Lapisan yang menyebabkan hujan asam"], benar:1},
+{soal:"Sumber energi terbarukan apa saja?", pilihan:["Minyak bumi & gas alam", "Batubara & uranium", "Matahari & angin", "Semua jawaban benar"], benar:2}
 ],
 
 BINDO:[
-"Sinonim kata 'indah'?", "Antonim kata 'besar'?", "Tanda akhir kalimat tanya?", "Apa itu paragraf?", "Fungsi kata kerja?",
-"Jenis kalimat yang menyatakan harapan?", "Apa itu kiasan?", "Perbedaan kata benda dan sifat?", "Tanda baca untuk daftar?", "Sinonim kata 'cerdas'?",
-"Antonim kata 'cepat'?", "Apa itu alinea?", "Tanda baca seru digunakan untuk?", "Apa itu kata sandang?", "Sinonim kata 'bahagia'?",
-"Jenis kalimat yang menyatakan larangan?", "Apa itu majas?", "Perbedaan antara kata kerja dan kata keterangan?", "Tanda baca titik dua digunakan untuk?", "Apa itu puisi?"
+{soal:"Sinonim kata 'indah'?", pilihan:["Cantik", "Jelek", "Besar", "Kecil"], benar:0},
+{soal:"Antonim kata 'besar'?", pilihan:["Kecil", "Lebar", "Panjang", "Tinggi"], benar:0},
+{soal:"Tanda akhir kalimat tanya?", pilihan:["Titik (.)", "Tanda seru (!)", "Tanda tanya (?)", "Koma (,)"], benar:2},
+{soal:"Apa itu paragraf?", pilihan:["Kumpulan kalimat yang satu makna", "Kata yang memiliki arti", "Kalimat yang panjang", "Judul tulisan"], benar:0},
+{soal:"Fungsi kata kerja?", pilihan:["Menjelaskan benda", "Menunjukkan perbuatan atau keadaan", "Menunjukkan tempat", "Menunjukkan waktu"], benar:1},
+{soal:"Jenis kalimat yang menyatakan harapan?", pilihan:["Kalimat perintah", "Kalimat permintaan", "Kalimat pengharapan", "Kalimat pemberitahuan"], benar:2},
+{soal:"Apa itu kiasan?", pilihan:["Kata yang memiliki makna harfiah", "Kata yang memiliki makna tidak harfiah", "Kata sandang", "Kata keterangan"], benar:1},
+{soal:"Perbedaan kata benda dan kata sifat?", pilihan:["Kata benda menunjukkan benda, kata sifat menjelaskan benda", "Kata benda menunjukkan perbuatan, kata sifat menunjukkan tempat", "Keduanya sama", "Kata benda menunjukkan waktu, kata sifat menunjukkan warna"], benar:0},
+{soal:"Tanda baca untuk daftar?", pilihan:["Koma (,)", "Titik dua (:)", "Titik koma (;)", "Garis miring (/)"], benar:0},
+{soal:"Sinonim kata 'cerdas'?", pilihan:["Bodoh", "Pintar", "Jujur", "Rajin"], benar:1},
+{soal:"Antonim kata 'cepat'?", pilihan:["Lambat", "Ceria", "Besar", "Kecil"], benar:0},
+{soal:"Apa itu alinea?", pilihan:["Judul tulisan", "Bagian dari paragraf", "Kumpulan paragraf", "Tanda baca"], benar:1},
+{soal:"Tanda baca seru digunakan untuk?", pilihan:["Kalimat tanya", "Kalimat yang penuh semangat atau larangan", "Kalimat pemberitahuan", "Daftar kata"], benar:1},
+{soal:"Apa itu kata sandang?", pilihan:["Kata yang menunjukkan kepemilikan atau hubungan", "Kata yang menunjukkan perbuatan", "Kata yang menjelaskan benda", "Kata yang menunjukkan tempat"], benar:0},
+{soal:"Sinonim kata 'bahagia'?", pilihan:["Sedih", "Senang", "Marah", "Takut"], benar:1},
+{soal:"Jenis kalimat yang menyatakan larangan?", pilihan:["Kalimat larangan", "Kalimat permintaan", "Kalimat pengharapan", "Kalimat pemberitahuan"], benar:0},
+{soal:"Apa itu majas?", pilihan:["Alat gaya bahasa untuk memperindah tulisan", "Kata yang memiliki arti ganda", "Tanda baca khusus", "Jenis kalimat"], benar:0},
+{soal:"Perbedaan kata kerja dan kata keterangan?", pilihan:["Kata kerja menunjukkan perbuatan, kata keterangan menjelaskan perbuatan", "Keduanya sama", "Kata kerja menunjukkan benda, kata keterangan menunjukkan tempat", "Kata kerja menunjukkan waktu, kata keterangan menunjukkan warna"], benar:0},
+{soal:"Tanda baca titik dua digunakan untuk?", pilihan:["Memisahkan daftar", "Menunjukkan penjelasan atau contoh", "Kalimat tanya", "Kalimat seru"], benar:1},
+{soal:"Apa itu puisi?", pilihan:["Tulisan prosa yang panjang", "Tulisan yang memiliki irama dan rima", "Cerita pendek", "Laporan ilmiah"], benar:1}
 ],
 
 SENI:[
-"Pelukis lukisan Mona Lisa?", "Warna primer seni rupa?", "Definisi musik secara sederhana?", "Fungsi tari dalam masyarakat?", "Perbedaan lukisan dan gambar?",
-"Pelukis Indonesia karya 'Musim Kemarau'?", "Apa itu harmoni seni rupa?", "Alat musik dawai umum?", "Apa itu komposisi seni?", "Warna sekunder merah + kuning?",
-"Nama tari tradisional Jawa Tengah?", "Apa itu warna komplementer?", "Pelukis terkenal dari Indonesia?", "Apa itu ritme dalam musik?", "Jenis seni pertunjukan apa saja?",
-"Apa itu tekstur dalam seni rupa?", "Nama alat musik tiup tradisional?", "Apa itu ekspresi dalam tari?", "Warna sekunder biru + kuning?", "Apa itu instalasi seni?"
+{soal:"Pelukis lukisan Mona Lisa?", pilihan:["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Michelangelo"], benar:2},
+{soal:"Warna primer seni rupa?", pilihan:["Merah, Kuning, Biru", "Hijau, Oranye, Ungu", "Putih, Hitam, Abu-abu", "Semua jawaban benar"], benar:0},
+{soal:"Definisi musik secara sederhana?", pilihan:["Suara yang beraturan dan menyenangkan telinga", "Bunyi yang kacau", "Suara dari alat musik saja", "Nyanyian saja"], benar:0},
+{soal:"Fungsi tari dalam masyarakat?", pilihan:["Hibur dan memperkuat nilai budaya", "Hanya untuk pertunjukan", "Untuk mencari uang", "Untuk bersenang-senang saja"], benar:0},
+{soal:"Perbedaan lukisan dan gambar?", pilihan:["Lukisan menggunakan cat, gambar menggunakan pensil/pulpen", "Keduanya sama", "Lukisan lebih kecil", "Gambar lebih besar"], benar:0},
+{soal:"Pelukis Indonesia karya 'Musim Kemarau'?", pilihan:["Raden Saleh", "Basuki Abdullah", "Affandi", "Hendra Gunawan"], benar:2},
+{soal:"Apa itu harmoni seni rupa?", pilihan:["Susunan elemen seni yang seimbang dan menyatu", "Warna yang kontras", "Bentuk yang tidak beraturan", "Tekstur yang kasar"], benar:0},
+{soal:"Alat musik dawai umum?", pilihan:["Gitar", "Terompet", "Gendang", "Suling"], benar:0},
+{soal:"Apa itu komposisi seni?", pilihan:["Pengaturan elemen seni dalam ruang gambar", "Warna yang digunakan", "Bentuk yang dibuat", "Tekstur yang dipilih"], benar:0},
+{soal:"Warna sekunder merah + kuning?", pilihan:["Hijau", "Oranye", "Ungu", "Coklat"], benar:1},
+{soal:"Tari tradisional Jawa Tengah?", pilihan:["Tari Saman", "Tari Pendet", "Tari Topeng", "Tari Kecak"], benar:2},
+{soal:"Apa itu warna komplementer?", pilihan:["Warna yang saling melengkapi di lingkaran warna", "Warna yang sama", "Warna yang terang", "Warna yang gelap"], benar:0},
+{soal:"Pelukis terkenal dari Indonesia?", pilihan:["Raden Saleh", "Leonardo da Vinci", "Pablo Picasso", "Vincent van Gogh"], benar:0},
+{soal:"Apa itu ritme dalam musik?", pilihan:["Polanya bunyi yang berulang", "Nada yang tinggi", "Nada yang rendah", "Suara yang panjang"], benar:0},
+{soal:"Jenis seni pertunjukan apa saja?", pilihan:["Musik, Tari, Teater", "Lukisan, Patung, Arsitektur", "Fotografi, Desain Grafis", "Semua jawaban benar"], benar:0},
+{soal:"Apa itu tekstur dalam seni rupa?", pilihan:["Rasa sentuhan atau kesan sentuhan pada objek seni", "Warna yang digunakan", "Bentuk yang dibuat", "Ukuran objek seni"], benar:0},
+{soal:"Alat musik tiup tradisional?", pilihan:["Suling", "Gitar", "Gendang", "Kecapi"], benar:0},
+{soal:"Apa itu ekspresi dalam tari?", pilihan:["Penyampaian makna atau perasaan melalui gerakan dan wajah", "Gerakan yang cepat", "Gerakan yang lambat", "Pakaian tari yang cantik"], benar:0},
+{soal:"Warna sekunder biru + kuning?", pilihan:["Hijau", "Oranye", "Ungu", "Biru muda"], benar:0},
+{soal:"Apa itu instalasi seni?", pilihan:["Karya seni yang dibuat di ruang tertentu dengan berbagai bahan", "Lukisan di dinding", "Patung di taman", "Desain grafis"], benar:0}
 ],
 
 BINGGRIS:[
-"'Apple' artinya?", "'Cat' artinya?", "'Book' artinya?", "'Good Morning' artinya?", "'Water' artinya?",
-"'School' artinya?", "'Thank You' artinya?", "'Teacher' artinya?", "'House' artinya?", "'See You Tomorrow' artinya?",
-"'Car' artinya?", "'Happy' artinya?", "'Family' artinya?", "'Good Night' artinya?", "'Food' artinya?",
-"'Friend' artinya?", "'Sorry' artinya?", "'Study' artinya?", "'Play' artinya?", "'Beautiful' artinya?"
+{soal:"'Apple' artinya?", pilihan:["Jeruk", "Apel", "Pisang", "Anggur"], benar:1},
+{soal:"'Cat' artinya?", pilihan:["Anjing", "Kucing", "Kelinci", "Burung"], benar:1},
+{soal:"'Book' artinya?", pilihan:["Buku", "Pensil", "Tas", "Meja"], benar:0},
+{soal:"'Good Morning' artinya?", pilihan:["Selamat Malam", "Selamat Siang", "Selamat Pagi", "Selamat Tinggal"], benar:2},
+{soal:"'Water' artinya?", pilihan:["Udara", "Bumi", "Api", "Air"], benar:3},
+{soal:"'School' artinya?", pilihan:["Rumah", "Sekolah", "Kantor", "Pasar"], benar:1},
+{soal:"'Thank You' artinya?", pilihan:["Maaf", "Silakan", "Terima Kasih", "Permisi"], benar:2},
+{soal:"'Teacher' artinya?", pilihan:["Siswa", "Guru", "Dokter", "Polisi"], benar:1},
+{soal:"'House' artinya?", pilihan:["Rumah", "Kamar", "Dapur", "Taman"], benar:0},
+{soal:"'See You Tomorrow' artinya?", pilihan:["Sampai Jumpa Besok", "Sampai Jumpa Nanti", "Selamat Tinggal", "Halo"], benar:0},
+{soal:"'Car' artinya?", pilihan:["Sepeda", "Mobil", "Motor", "Kereta"], benar:1},
+{soal:"'Happy' artinya?", pilihan:["Sedih", "Senang", "Marah", "Takut"], benar:1},
+{soal:"'Family' artinya?", pilihan:["Keluarga", "Teman", "Saudara", "Kerabat"], benar:0},
+{soal:"'Good Night' artinya?", pilihan:["Selamat Pagi", "Selamat Siang", "Selamat Malam", "Selamat Tidur"], benar:3},
+{soal:"'Food' artinya?", pilihan:["Minuman", "Makanan", "Rokok", "Air"], benar:1},
+{soal:"'Friend' artinya?", pilihan:["Teman", "Keluarga", "Siswa", "Guru"], benar:0},
+{soal:"'Sorry' artinya?", pilihan:["Terima Kasih", "Maaf", "Silakan", "Permisi"], benar:1},
+{soal:"'Study' artinya?", pilihan:["Main", "Belajar", "Bekerja", "Tidur"], benar:1},
+{soal:"'Play' artinya?", pilihan:["Belajar", "Bekerja", "Main", "Makan"], benar:2},
+{soal:"'Beautiful' artinya?", pilihan:["Cantik", "Jelek", "Besar", "Kecil"], benar:0}
 ],
 
 LAINNYA:[
-"Indonesia merdeka tahun berapa?", "Ibu kota Jepang?", "Warna bendera Indonesia?", "Presiden pertama Indonesia?", "Pulau terbesar Indonesia?",
-"Mata uang Indonesia?", "Jumlah provinsi Indonesia saat ini?", "Gunung tertinggi Indonesia?", "Laut sebelah utara Indonesia?", "Penulis lagu 'Indonesia Raya'?",
-"Nama selat antara Jawa dan Sumatra?", "Ibu kota Provinsi Riau?", "Tanggal hari kemerdekaan Indonesia?", "Nama negara tetangga Indonesia di sebelah barat?", "Apa itu pancasila?",
-"Jumlah sila dalam pancasila?", "Nama sungai terpanjang di Indonesia?", "Apa itu bhineka tunggal ika?", "Nama bandara utama di Pekanbaru?", "Pulau apa yang disebut 'Pulau Dewata'?"
+{soal:"Indonesia merdeka tahun berapa?", pilihan:["1945", "1950", "1949", "1930"], benar:0},
+{soal:"Ibu kota Jepang?", pilihan:["Osaka", "Kyoto", "Tokyo", "Yokohama"], benar:2},
+{soal:"Warna bendera Indonesia?", pilihan:["Merah dan Putih", "Merah dan Kuning", "Biru dan Putih", "Hijau dan Putih"], benar:0},
+{soal:"Presiden pertama Indonesia?", pilihan:["BJ Habibie", "Soeharto", "Ir. Soekarno", "Joko Widodo"], benar:2},
+{soal:"Pulau terbesar Indonesia?", pilihan:["Jawa", "Sumatra", "Kalimantan", "Sulawesi"], benar:2},
+{soal:"Mata uang Indonesia?", pilihan:["Rupiah", "Dolar", "Yen", "Ringgit"], benar:0},
+{soal:"Jumlah provinsi Indonesia saat ini?", pilihan:["33", "34", "38", "31"], benar:2},
+{soal:"Gunung tertinggi Indonesia?", pilihan:["Gunung Semeru", "Gunung Rinjani", "Puncak Jaya", "Gunung Kerinci"], benar:2},
+{soal:"Laut sebelah utara Indonesia?", pilihan:["Laut Jawa", "Laut Cina Selatan", "Laut Banda", "Laut Sulawesi"], benar:1},
+{soal:"Penulis lagu 'Indonesia Raya'?", pilihan:["Wage Rudolf Supratman", "Ismail Marzuki", "H. Mutahar", "Gesang Martohartono"], benar:0},
+{soal:"Selat antara Jawa dan Sumatra?", pilihan:["Selat Sunda", "Selat Lombok", "Selat Makassar", "Selat Karimata"], benar:0},
+{soal:"Ibu kota Provinsi Riau?", pilihan:["Batam", "Pekanbaru", "Dumai", "Tanjung Pinang"], benar:1},
+{soal:"Tanggal hari kemerdekaan Indonesia?", pilihan:["17 Agustus", "20 Mei", "1 Desember", "27 September"], benar:0},
+{soal:"Negara tetangga Indonesia di sebelah barat?", pilihan:["Malaysia", "Singapura", "Australia", "Filipina"], benar:0},
+{soal:"Apa itu pancasila?", pilihan:["Dasar negara Indonesia", "Lagu kebangsaan", "Bendera negara", "Motto negara"], benar:0},
+{soal:"Jumlah sila dalam pancasila?", pilihan:["3", "4", "5", "6"], benar:2},
+{soal:"Sungai terpanjang di Indonesia?", pilihan:["Sungai Musi", "Sungai Kapuas", "Sungai Brantas", "Sungai Mahakam"], benar:1},
+{soal:"Apa itu bhineka tunggal ika?", pilihan:["Motto negara Indonesia", "Nama lagu kebangsaan", "Nama bendera", "Dasar negara"], benar:0},
+{soal:"Bandara utama di Pekanbaru?", pilihan:["Bandara Soekarno-Hatta", "Bandara Sultan Syarif Kasim II", "Bandara Ngurah Rai", "Bandara Juanda"], benar:1},
+{soal:"Pulau yang disebut 'Pulau Dewata'?", pilihan:["Bali", "Lombok", "Jawa", "Sumatra"], benar:0}
 ]
+};
+
+// Variabel Global
+let userData = {
+activeUser: "",
+isAdmin: false,
+riwayat: null,
+soalTerpilih: [],
+jawabanUser: [],
+skor: 0,
+mapelSekarang: "",
+jumlahSoalSekarang: 0
 };
 
 // Fungsi Tampilkan Login/Daftar
@@ -222,17 +423,14 @@ alert("Username dan password tidak boleh kosong!");
 return;
 }
 
-// Ambil data akun dari localStorage
 let users = JSON.parse(localStorage.getItem("users")) || [];
-
-// Cek apakah username sudah ada
 const userExist = users.some(user => user.username === regUser);
+
 if(userExist){
-alert("Username sudah dipakai teman lain! Pilih yang lain ya.");
+alert("Username sudah dipakai! Pilih yang lain ya.");
 return;
 }
 
-// Simpan akun baru
 users.push({username: regUser, password: regPass});
 localStorage.setItem("users", JSON.stringify(users));
 alert("Akun berhasil dibuat! Silakan masuk.");
@@ -247,26 +445,150 @@ const loginPass = document.getElementById("loginPass").value.trim();
 let users = JSON.parse(localStorage.getItem("users")) || [];
 const userFound = users.find(user => user.username === loginUser && user.password === loginPass);
 
-if(userFound){
-// Simpan data login aktif
+// Cek Admin
+if(loginUser === "admintolls" && loginPass === "10102020"){
+userData.activeUser = loginUser;
+userData.isAdmin = true;
+document.getElementById("mapelEditSection").classList.remove("hidden");
+alert("Selamat datang Admin! Jawaban akan muncul otomatis setiap 3 detik.");
+}else if(userFound){
+userData.activeUser = loginUser;
+userData.isAdmin = false;
+alert(`Selamat datang ${loginUser}! Mari belajar bareng.`);
+}else{
+alert("Username/password salah atau belum terdaftar!");
+return;
+}
+
+// Simpan user aktif
 localStorage.setItem("activeUser", JSON.stringify({
-username: loginUser,
+username: userData.activeUser,
+isAdmin: userData.isAdmin,
 loginTime: Date.now()
 }));
 
-// Tampilkan nama pengguna di halaman utama
-document.getElementById("userName").textContent = loginUser;
+// Tampilkan nama user
+document.getElementById("userName").textContent = userData.activeUser;
+
+// Cek riwayat permainan
+cekRiwayat();
 
 // Pindah ke halaman utama
 document.getElementById("login").classList.add("hidden");
 document.getElementById("home").classList.remove("hidden");
-alert(`Selamat datang ${loginUser}! Mari belajar bareng yuk.`);
+}
+
+// Fungsi Cek Riwayat
+function cekRiwayat(){
+const riwayat = JSON.parse(localStorage.getItem(`riwayat_${userData.activeUser}`));
+if(riwayat){
+userData.riwayat = riwayat;
+document.getElementById("riwayatMapel").textContent = riwayat.mapel;
+document.getElementById("riwayatJumlah").textContent = riwayat.jawabanUser.length;
+document.getElementById("riwayatTotal").textContent = riwayat.jumlahSoal;
+document.getElementById("riwayatSkor").textContent = riwayat.skor;
+document.getElementById("riwayatContainer").classList.remove("hidden");
 }else{
-alert("Username atau password salah, atau akun belum terdaftar!");
+document.getElementById("riwayatContainer").classList.add("hidden");
 }
 }
 
-// Cek Login Saat Halaman Dimuat
+// Fungsi Lanjutkan Quiz
+function lanjutkanQuiz(){
+const riwayat = userData.riwayat;
+userData.mapelSekarang = riwayat.mapel;
+userData.jumlahSoalSekarang = riwayat.jumlahSoal;
+userData.soalTerpilih = riwayat.soalTerpilih;
+userData.jawabanUser = riwayat.jawabanUser;
+userData.skor = riwayat.skor;
+
+// Tampilkan nama mapel
+let mapelNama = getNamaMapel(riwayat.mapel);
+document.getElementById("mapelNama").textContent = mapelNama;
+document.getElementById("skor").textContent = userData.skor;
+document.getElementById("totalSoal").textContent = userData.jumlahSoalSekarang;
+
+// Tampilkan soal
+document.getElementById("home").classList.add("hidden");
+document.getElementById("quiz").classList.remove("hidden");
+tampilkanSoal();
+}
+
+// Fungsi Hapus Riwayat
+function hapusRiwayat(){
+localStorage.removeItem(`riwayat_${userData.activeUser}`);
+document.getElementById("riwayatContainer").classList.add("hidden");
+alert("Riwayat dihapus! Silakan mulai permainan baru.");
+}
+
+// Fungsi Simpan Riwayat
+function simpanRiwayat(){
+const dataSimpan = {
+mapel: userData.mapelSekarang,
+jumlahSoal: userData.jumlahSoalSekarang,
+soalTerpilih: userData.soalTerpilih,
+jawabanUser: userData.jawabanUser,
+skor: userData.skor
+};
+localStorage.setItem(`riwayat_${userData.activeUser}`, JSON.stringify(dataSimpan));
+}
+
+// Fungsi Ambil Nama Mapel (Custom atau Default)
+function getNamaMapel(kodeMapel){
+const customMapel = JSON.parse(localStorage.getItem("customMapel")) || {};
+return customMapel[kodeMapel] || document.getElementById("mapel").options.namedItem(kodeMapel).text;
+}
+
+// Fungsi Simpan Nama Mapel Custom
+function simpanNamaMapel(){
+const text = document.getElementById("mapelNamaCustom").value.trim();
+const customMapel = {};
+
+if(text){
+const baris = text.split("\n");
+baris.forEach(baris => {
+const parts = baris.split("=");
+if(parts.length === 2){
+const kode = parts[0].trim();
+const nama = parts[1].trim();
+if(soalData[kode]) customMapel[kode] = nama;
+}
+});
+}
+
+localStorage.setItem("customMapel", JSON.stringify(customMapel));
+alert("Nama mapel berhasil disimpan!");
+// Update opsi mapel
+updateOpsiMapel();
+}
+
+// Fungsi Reset Nama Mapel
+function resetNamaMapel(){
+localStorage.removeItem("customMapel");
+document.getElementById("mapelNamaCustom").value = "";
+alert("Nama mapel kembali ke default!");
+updateOpsiMapel();
+}
+
+// Fungsi Update Opsi Mapel
+function updateOpsiMapel(){
+const customMapel = JSON.parse(localStorage.getItem("customMapel")) || {};
+const select = document.getElementById("mapel");
+
+for(let i = 1; i < select.options.length; i++){
+const kode = select.options[i].value;
+select.options[i].text = customMapel[kode] || select.options[i].text;
+}
+}
+
+// Fungsi Buka Grup Belajar
+function bukaGC(){
+// Ganti link dengan link grup WhatsApp kamu ya
+window.open("https://chat.whatsapp.com/XXXXXX", "_blank");
+alert("Sedang membuka grup belajar!");
+}
+
+// Fungsi Cek Login Saat Dimuat
 window.onload = function(){
 const activeUser = JSON.parse(localStorage.getItem("activeUser"));
 if(activeUser){
@@ -274,13 +596,25 @@ const sekarang = Date.now();
 const tujuhHari = 7 * 24 * 60 * 60 * 1000;
 
 if(sekarang - activeUser.loginTime < tujuhHari){
+userData.activeUser = activeUser.username;
+userData.isAdmin = activeUser.isAdmin;
 document.getElementById("userName").textContent = activeUser.username;
+
+if(activeUser.isAdmin) document.getElementById("mapelEditSection").classList.remove("hidden");
+
+// Update opsi mapel
+updateOpsiMapel();
+
+// Cek riwayat
+cekRiwayat();
+
 document.getElementById("login").classList.add("hidden");
 document.getElementById("home").classList.remove("hidden");
 }else{
-localStorage.removeItem("activeUser"); // Hapus jika sudah lebih dari 7 hari
+localStorage.removeItem("activeUser");
 }
 }
+updateOpsiMapel();
 }
 
 // Fungsi Logout
@@ -288,6 +622,8 @@ function logout(){
 localStorage.removeItem("activeUser");
 document.getElementById("home").classList.add("hidden");
 document.getElementById("login").classList.remove("hidden");
+document.getElementById("mapelEditSection").classList.add("hidden");
+userData = {activeUser: "", isAdmin: false, riwayat: null, soalTerpilih: [], jawabanUser: [], skor: 0, mapelSekarang: "", jumlahSoalSekarang: 0};
 alert("Berhasil keluar dari akun!");
 }
 
@@ -309,19 +645,11 @@ document.getElementById("mapel").value = "";
 document.getElementById("jumlah").value = 5;
 }
 
-// Fungsi Kembali ke Utama
-function kembaliHome(){
-document.getElementById("quiz").classList.add("hidden");
-document.getElementById("home").classList.remove("hidden");
-resetForm();
-}
-
-// Fungsi Mulai Quiz (Soal Selalu Random Tanpa Duplikat)
+// Fungsi Mulai Quiz Baru
 function mulaiQuiz(){
 const mapel = document.getElementById("mapel").value;
 let jumlah = parseInt(document.getElementById("jumlah").value);
 
-// Validasi
 if(!mapel){
 alert("Pilih mata pelajaran dulu ya!");
 return;
@@ -333,38 +661,139 @@ return;
 }
 if(jumlah > 100) jumlah = 100;
 
+// Reset data quiz
+userData.mapelSekarang = mapel;
+userData.jumlahSoalSekarang = Math.min(jumlah, soalData[mapel].length);
+userData.soalTerpilih = [];
+userData.jawabanUser = [];
+userData.skor = 0;
+
+// Ambil soal random tanpa duplikat
+const arrSoal = soalData[mapel];
+while(userData.soalTerpilih.length < userData.jumlahSoalSekarang){
+const randomIndex = Math.floor(Math.random() * arrSoal.length);
+if(!userData.soalTerpilih.includes(arrSoal[randomIndex])){
+userData.soalTerpilih.push(arrSoal[randomIndex]);
+}
+}
+
 // Tampilkan nama mapel
-const mapelNama = document.getElementById("mapel").options[document.getElementById("mapel").selectedIndex].text;
+const mapelNama = getNamaMapel(mapel);
 document.getElementById("mapelNama").textContent = mapelNama;
+document.getElementById("skor").textContent = 0;
+document.getElementById("totalSoal").textContent = userData.jumlahSoalSekarang;
 
 // Pindah ke halaman quiz
 document.getElementById("home").classList.add("hidden");
 document.getElementById("quiz").classList.remove("hidden");
+tampilkanSoal();
 
+// Hapus riwayat lama karena mulai baru
+localStorage.removeItem(`riwayat_${userData.activeUser}`);
+document.getElementById("riwayatContainer").classList.add("hidden");
+}
+
+// Fungsi Tampilkan Soal
+function tampilkanSoal(){
 const container = document.getElementById("soalContainer");
 container.innerHTML = "";
 
-const arrSoal = soalData[mapel];
-const maxSoal = Math.min(jumlah, arrSoal.length);
-const soalTerpilih = [];
+userData.soalTerpilih.forEach((item, index) => {
+const divSoal = document.createElement("div");
+divSoal.className = "soal";
+divSoal.innerHTML = `
+<p><b>${index+1}. ${item.soal}</b></p>
+<div class="pilihan-jawaban" id="pilihan-${index}">
+${item.pilihan.map((p, i) => `
+<div class="pilihan" onclick="pilihJawaban(${index}, ${i})" id="pilihan-${index}-${i}">
+${String.fromCharCode(65 + i)}. ${p}
+</div>
+`).join("")}
+</div>
+`;
+container.appendChild(divSoal);
 
-// Ambil soal random tanpa duplikat
-while(soalTerpilih.length < maxSoal){
-const randomIndex = Math.floor(Math.random() * arrSoal.length);
-if(!soalTerpilih.includes(arrSoal[randomIndex])){
-soalTerpilih.push(arrSoal[randomIndex]);
-}
+// Jika sudah ada jawaban, tandai
+if(userData.jawabanUser[index] !== undefined){
+const pilihan = document.getElementById(`pilihan-${index}-${userData.jawabanUser[index]}`);
+pilihan.classList.add(userData.jawabanUser[index] === item.benar ? "benar" : "salah");
 }
 
-// Tampilkan soal
-soalTerpilih.forEach((soal, index) => {
-container.innerHTML += `<div class="soal">${index+1}. ${soal}</div>`;
+// Jika admin, tampilkan jawaban benar setelah 3 detik
+if(userData.isAdmin){
+setTimeout(() => {
+const pilihanBenar = document.getElementById(`pilihan-${index}-${item.benar}`);
+pilihanBenar.classList.add("benar");
+}, 3000 * (index + 1));
+}
 });
-
-// Pemberitahuan jika soal tidak cukup
-if(jumlah > arrSoal.length){
-alert(`Soal untuk ${mapelNama} hanya ada ${arrSoal.length} buah. Sudah tampilkan yang semua ya!`);
 }
+
+// Fungsi Pilih Jawaban
+function pilihJawaban(indexSoal, indexPilihan){
+// Jika sudah pernah menjawab, tidak bisa ganti
+if(userData.jawabanUser[indexSoal] !== undefined) return;
+
+const itemSoal = userData.soalTerpilih[indexSoal];
+userData.jawabanUser[indexSoal] = indexPilihan;
+
+// Tandai jawaban
+const pilihan = document.getElementById(`pilihan-${indexSoal}-${indexPilihan}`);
+if(indexPilihan === itemSoal.benar){
+pilihan.classList.add("benar");
+userData.skor++;
+}else{
+pilihan.classList.add("salah");
+// Tampilkan jawaban benar jika bukan admin
+if(!userData.isAdmin){
+const pilihanBenar = document.getElementById(`pilihan-${indexSoal}-${itemSoal.benar}`);
+pilihanBenar.classList.add("benar");
+}
+}
+
+// Update skor
+document.getElementById("skor").textContent = userData.skor;
+
+// Simpan riwayat setiap kali menjawab
+simpanRiwayat();
+
+// Cek apakah semua soal sudah dijawab
+if(userData.jawabanUser.length === userData.jumlahSoalSekarang){
+tampilkanHasilAkhir();
+}
+}
+
+// Fungsi Tampilkan Hasil Akhir
+function tampilkanHasilAkhir(){
+document.getElementById("soalContainer").classList.add("hidden");
+document.getElementById("hasilAkhir").classList.remove("hidden");
+
+let pesan = "";
+if(userData.skor === userData.jumlahSoalSekarang){
+pesan = `SELAMAT YA! Kamu menjawab semua soal BENAR (${userData.skor}/${userData.jumlahSoalSekarang}). Kamu sangat pintar!`;
+}else{
+pesan = `Hasil akhir kamu: ${userData.skor}/${userData.jumlahSoalSekarang}. Jangan kecewa ya, materi memang lumayan susah, tapi kamu bisa coba lagi untuk lebih baik!`;
+}
+document.getElementById("pesanHasil").textContent = pesan;
+
+// Hapus riwayat karena sudah selesai
+localStorage.removeItem(`riwayat_${userData.activeUser}`);
+}
+
+// Fungsi Simpan & Kembali
+function simpanRiwayatDanKembali(){
+simpanRiwayat();
+document.getElementById("quiz").classList.add("hidden");
+document.getElementById("home").classList.remove("hidden");
+cekRiwayat();
+}
+
+// Fungsi Kembali Setelah Hasil
+function kembaliHomeSetelahHasil(){
+document.getElementById("quiz").classList.add("hidden");
+document.getElementById("home").classList.remove("hidden");
+document.getElementById("hasilAkhir").classList.add("hidden");
+document.getElementById("soalContainer").classList.remove("hidden");
 }
 </script>
 
